@@ -22,11 +22,11 @@ This is an offline-first Android application that automatically intercepts incom
 Here is a breakdown of the structural components implemented in the repository:
 
 * **Build Configurations:**
-  * [settings.gradle.kts](file:///home/kyo/Developer/jubilant-umbrella/settings.gradle.kts)
-  * [build.gradle.kts](file:///home/kyo/Developer/jubilant-umbrella/build.gradle.kts)
-  * [gradle.properties](file:///home/kyo/Developer/jubilant-umbrella/gradle.properties)
-  * [gradle-wrapper.properties](file:///home/kyo/Developer/jubilant-umbrella/gradle/wrapper/gradle-wrapper.properties)
-  * [app/build.gradle.kts](file:///home/kyo/Developer/jubilant-umbrella/app/build.gradle.kts)
+  * [settings.gradle.kts](settings.gradle.kts)
+  * [build.gradle.kts](build.gradle.kts)
+  * [gradle.properties](gradle.properties)
+  * [gradle-wrapper.properties](gradle/wrapper/gradle-wrapper.properties)
+  * [app/build.gradle.kts](app/build.gradle.kts)
   * [AndroidManifest.xml](file:///home/kyo/Developer/jubilant-umbrella/app/src/main/AndroidManifest.xml)
 
 * **App Initialization & DI:**
