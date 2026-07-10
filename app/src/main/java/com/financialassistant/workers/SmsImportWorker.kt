@@ -31,12 +31,15 @@ class SmsImportWorker @AssistedInject constructor(
                 null,
                 null,
                 "date DESC"
-            )
+            ) ?: run {
+                Timber.w("SMS inbox query returned null cursor (permission denied or provider unavailable).")
+                return@withContext Result.failure()
+            }
 
             var totalParsed = 0
             var totalSaved = 0
 
-            cursor?.use { c ->
+            cursor.use { c ->
                 val addressColumn = c.getColumnIndex("address")
                 val bodyColumn = c.getColumnIndex("body")
                 val dateColumn = c.getColumnIndex("date")
