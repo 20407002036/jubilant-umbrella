@@ -1,0 +1,48 @@
+# Built artifacts
+**/build/
+*.apk
+*.aar
+*.ap_
+*.der
+
+# Gradle files
+.gradle/
+/local.properties
+/gradle/wrapper/gradle-wrapper.jar
+.gradle
+
+# Android Studio / IntelliJ files
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/dictionaries
+.idea/libraries
+.idea/caches
+.idea/modules.xml
+.idea/compiler.xml
+.idea/misc.xml
+*.iml
+*.ipr
+*.iws
+
+# Log files
+*.log
+/captures/
+
+# OS-generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Keystore files
+*.jks
+*.keystore
+*.pepk
+
+# Kotlin specific
+.kotlin/
