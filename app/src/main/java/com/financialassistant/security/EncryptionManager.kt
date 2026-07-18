@@ -23,10 +23,8 @@ object EncryptionManager {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
-            Timber.e(e, "Error creating EncryptedSharedPreferences, falling back to standard EncryptedSharedPreferences")
-            // Fallback to basic shared preferences in standard non-Keystore environments if necessary,
-            // but for Android security guidelines, we prefer throwing or handling appropriately.
-            context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+            Timber.e(e, "Error creating EncryptedSharedPreferences")
+            throw e
         }
     }
 }
