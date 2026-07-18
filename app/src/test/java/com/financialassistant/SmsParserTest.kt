@@ -13,10 +13,30 @@ class SmsParserTest {
 
     @Test
     fun testSenderFilter() {
+        // Standard names
         assertTrue(SenderFilter.isFinancialSender("MPESA"))
         assertTrue(SenderFilter.isFinancialSender("KCB-Alert"))
+        
+        // International/Carrier variations common on physical devices
+        assertTrue(SenderFilter.isFinancialSender("+254MPESA"))
+        assertTrue(SenderFilter.isFinancialSender("EquityBank"))
+        assertTrue(SenderFilter.isFinancialSender("Safaricom")) // Should fail if not in set
+        
         assertEquals("M-PESA", SenderFilter.getProviderName("M-PESA"))
-        assertEquals("KCB", SenderFilter.getProviderName("KCBBANK"))
+        assertEquals("KCB", SenderFilter.getProviderName("+254KCBBANK"))
+    }
+
+    @Test
+    fun testMpesaPaybillParsing() {
+        val parser = MpesaParser()
+        val sms = "QY56781234 Confirmed. Ksh1,850.00 paid to NAIVAS SUPERMARKET on 9/7/26 at 1:20 PM. New M-PESA balance is Ksh5,000.00. Transaction cost, Ksh20.00."
+        val transaction = parser.parse(sms, 1773072000000L)
+
+        assertNotNull(transaction)
+        assertEquals("QY56781234", transaction?.receiptNumber)
+        assertEquals(1850.0, transaction?.amount ?: 0.0, 0.0)
+        assertEquals("NAIVAS SUPERMARKET", transaction?.merchant)
+        assertEquals(TransactionType.PAYBILL, transaction?.transactionType)
     }
 
     @Test
