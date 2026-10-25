@@ -21,6 +21,8 @@ interface TransactionRepository {
 
     suspend fun insertTransaction(transaction: Transaction): Boolean
     suspend fun insertTransactions(transactions: List<Transaction>): Int
+    suspend fun getTransactionByReceipt(receiptNumber: String): TransactionEntity?
+    suspend fun markTransactionSynced(receiptNumber: String, syncedAt: Long)
     suspend fun deleteTransaction(transaction: TransactionEntity)
     suspend fun clearAllData()
 }

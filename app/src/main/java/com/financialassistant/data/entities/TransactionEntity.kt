@@ -21,5 +21,6 @@ data class TransactionEntity(
     val originalSms: String,   // Raw SMS body
     val category: String = "Uncategorized",
     val senderPhone: String = "", // Counterparty phone (sender for RECEIVED), empty when unknown
-    val simSlot: Int = -1          // SIM slot the SMS arrived on (0, 1) or -1 when unknown
+    val simSlot: Int = -1,         // SIM slot the SMS arrived on (0, 1) or -1 when unknown
+    val syncedAt: Long = 0         // When this record was written to the Google Sheet, 0 = not synced
 )

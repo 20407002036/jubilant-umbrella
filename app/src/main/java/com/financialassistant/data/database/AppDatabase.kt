@@ -13,7 +13,7 @@ import com.financialassistant.data.entities.TransactionEntity
 
 @Database(
     entities = [TransactionEntity::class, CategoryEntity::class, RecipientEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -32,6 +32,16 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transactions ADD COLUMN senderPhone TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE transactions ADD COLUMN simSlot INTEGER NOT NULL DEFAULT -1")
+            }
+        }
+
+        /**
+         * Tracks which incoming payments have already been written to the user's
+         * Google Sheet so retries never append duplicate rows.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transactions ADD COLUMN syncedAt INTEGER NOT NULL DEFAULT 0")
             }
         }
 

@@ -8,6 +8,9 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.financialassistant.data.repository.TransactionRepository
 import com.financialassistant.security.EncryptionManager
+import com.financialassistant.sync.GoogleSheetSyncPreferences
+import com.financialassistant.sync.IncomeSyncClient
+import com.financialassistant.sync.SyncOutcome
 import com.financialassistant.tracking.MsisdnNormalizer
 import com.financialassistant.tracking.SmsSimSlotResolver
 import com.financialassistant.tracking.TrackedLinePreferences
@@ -31,7 +34,12 @@ data class SettingsUiState(
     val trackedNumberInput: String = "",
     val trackedNumber: String = "",
     val trackedSlot: Int = TrackedLinePreferences.SLOT_UNSPECIFIED,
-    val trackingMessage: String? = null
+    val trackingMessage: String? = null,
+    val sheetSyncEnabled: Boolean = false,
+    val sheetSyncUrl: String = "",
+    val sheetSyncSecret: String = "",
+    val sheetSyncMessage: String? = null,
+    val sheetSyncTesting: Boolean = false
 ) {
     val isTrackingConfigured: Boolean get() = trackedNumber.isNotBlank()
 }
@@ -40,7 +48,9 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: TransactionRepository,
-    private val trackedLinePreferences: TrackedLinePreferences
+    private val trackedLinePreferences: TrackedLinePreferences,
+    private val googleSheetSyncPreferences: GoogleSheetSyncPreferences,
+    private val incomeSyncClient: IncomeSyncClient
 ) : ViewModel() {
 
     private val sharedPrefs = EncryptionManager.getEncryptedSharedPreferences(context)
@@ -60,6 +70,7 @@ class SettingsViewModel @Inject constructor(
         }
         checkImportStatus()
         restoreTrackedLine()
+        restoreSheetSync()
     }
 
     fun setSmsPermissionGranted(granted: Boolean) {
@@ -137,6 +148,101 @@ class SettingsViewModel @Inject constructor(
             trackedSlot = TrackedLinePreferences.SLOT_UNSPECIFIED,
             trackingMessage = null
         )
+    }
+
+    private fun restoreSheetSync() {
+        _uiState.value = _uiState.value.copy(
+            sheetSyncEnabled = googleSheetSyncPreferences.enabled.value,
+            sheetSyncUrl = googleSheetSyncPreferences.webAppUrl.value,
+            sheetSyncSecret = googleSheetSyncPreferences.secret.value
+        )
+    }
+
+    fun onSheetSyncEnabledChange(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(
+            sheetSyncEnabled = enabled,
+            sheetSyncMessage = null
+        )
+        // Persist the switch immediately; the endpoint and secret still need Save.
+        googleSheetSyncPreferences.setEnabled(enabled)
+    }
+
+    fun onSheetSyncUrlChange(value: String) {
+        _uiState.value = _uiState.value.copy(
+            sheetSyncUrl = value,
+            sheetSyncMessage = null
+        )
+    }
+
+    fun onSheetSyncSecretChange(value: String) {
+        _uiState.value = _uiState.value.copy(
+            sheetSyncSecret = value,
+            sheetSyncMessage = null
+        )
+    }
+
+    /** Persists the Google Sheet endpoint and shared secret. */
+    fun saveSheetSync() {
+        val url = _uiState.value.sheetSyncUrl.trim()
+        if (url.isNotEmpty() && !url.startsWith("https://")) {
+            _uiState.value = _uiState.value.copy(
+                sheetSyncMessage = "The web app URL must start with https://."
+            )
+            return
+        }
+
+        googleSheetSyncPreferences.save(
+            enabled = _uiState.value.sheetSyncEnabled,
+            webAppUrl = url,
+            secret = _uiState.value.sheetSyncSecret
+        )
+
+        _uiState.value = _uiState.value.copy(
+            sheetSyncUrl = url,
+            sheetSyncMessage = when {
+                !_uiState.value.sheetSyncEnabled ->
+                    "Saved. Turn on sync to start logging incoming payments."
+                url.isBlank() ->
+                    "Saved. Add the Apps Script web app URL to start."
+                else ->
+                    "Saved. Money received on your tracked line will be added to the sheet."
+            }
+        )
+    }
+
+    /** Appends a test row so the user can confirm the script and secret work. */
+    fun sendSheetSyncTestRow() {
+        val url = _uiState.value.sheetSyncUrl.trim()
+        if (!url.startsWith("https://")) {
+            _uiState.value = _uiState.value.copy(
+                sheetSyncMessage = "Add the https:// Apps Script web app URL first."
+            )
+            return
+        }
+
+        googleSheetSyncPreferences.save(
+            enabled = _uiState.value.sheetSyncEnabled,
+            webAppUrl = url,
+            secret = _uiState.value.sheetSyncSecret
+        )
+        _uiState.value = _uiState.value.copy(
+            sheetSyncTesting = true,
+            sheetSyncMessage = "Sending a test row..."
+        )
+
+        viewModelScope.launch {
+            val message = when (val outcome = incomeSyncClient.sendTest()) {
+                SyncOutcome.Success -> "Test row sent. Check your sheet."
+                SyncOutcome.NotConfigured -> "Add the Apps Script web app URL first."
+                SyncOutcome.Unauthorized -> "The secret did not match the script."
+                is SyncOutcome.Rejected -> "The script rejected the request: ${outcome.message ?: "HTTP ${outcome.code}"}."
+                is SyncOutcome.Retry -> "Could not reach the script. Check the URL and your connection."
+            }
+            _uiState.value = _uiState.value.copy(
+                sheetSyncTesting = false,
+                sheetSyncMessage = message
+            )
+        }
     }
 
     private fun checkImportStatus() {

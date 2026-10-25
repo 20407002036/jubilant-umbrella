@@ -117,6 +117,13 @@ class TransactionRepositoryImpl @Inject constructor(
         return insertedCount
     }
 
+    override suspend fun getTransactionByReceipt(receiptNumber: String): TransactionEntity? =
+        transactionDao.getTransactionByReceipt(receiptNumber)
+
+    override suspend fun markTransactionSynced(receiptNumber: String, syncedAt: Long) {
+        transactionDao.markSynced(receiptNumber, syncedAt)
+    }
+
     override suspend fun deleteTransaction(transaction: TransactionEntity) {
         transactionDao.deleteTransaction(transaction)
     }

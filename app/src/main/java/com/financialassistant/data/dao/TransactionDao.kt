@@ -38,6 +38,9 @@ interface TransactionDao {
     @Query("UPDATE transactions SET simSlot = :simSlot WHERE id = :id")
     suspend fun updateSimSlot(id: Long, simSlot: Int)
 
+    @Query("UPDATE transactions SET syncedAt = :syncedAt WHERE receiptNumber = :receiptNumber")
+    suspend fun markSynced(receiptNumber: String, syncedAt: Long)
+
     @Query("SELECT SUM(amount) FROM transactions WHERE type = 'RECEIVED' AND timestamp >= :startTime")
     fun getIncomingSumSince(startTime: Long): Flow<Double?>
 
