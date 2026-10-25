@@ -7,6 +7,7 @@ import android.provider.Telephony
 import com.financialassistant.data.repository.TransactionRepository
 import com.financialassistant.sms.filters.SenderFilter
 import com.financialassistant.sms.parsers.ParserFactory
+import com.financialassistant.tracking.SmsSimSlotResolver
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,8 +34,12 @@ class SmsReceiver : BroadcastReceiver() {
                 if (SenderFilter.isFinancialSender(sender)) {
                     val parser = ParserFactory.getParser(sender)
                     if (parser != null) {
-                        val transaction = parser.parse(body, timestamp)
-                        if (transaction != null) {
+                        val parsed = parser.parse(body, timestamp)
+                        if (parsed != null) {
+                            // Tag the record with the SIM line the notification arrived on.
+                            val transaction = parsed.copy(
+                                simSlot = SmsSimSlotResolver.resolveSlot(context, intent)
+                            )
                             // Asynchronously insert the transaction
                             CoroutineScope(Dispatchers.IO).launch {
                                 val inserted = repository.insertTransaction(transaction)

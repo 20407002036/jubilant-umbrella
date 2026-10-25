@@ -43,6 +43,7 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToTransactions: () -> Unit,
     onNavigateToDetails: (String) -> Unit,
+    onNavigateToIncoming: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -63,15 +64,27 @@ fun HomeScreen(
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                     color = TextPrimary
                 )
-                IconButton(
-                    onClick = onNavigateToSettings,
-                    colors = IconButtonDefaults.iconButtonColors(contentColor = TextPrimary)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        modifier = Modifier.size(26.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onNavigateToIncoming,
+                        colors = IconButtonDefaults.iconButtonColors(contentColor = TextPrimary)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CallReceived,
+                            contentDescription = "My lines",
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onNavigateToSettings,
+                        colors = IconButtonDefaults.iconButtonColors(contentColor = TextPrimary)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
                 }
             }
         },

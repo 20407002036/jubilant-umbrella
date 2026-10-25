@@ -67,6 +67,31 @@ class SmsParserTest {
         assertEquals(2400.0, transaction?.balance ?: 0.0, 0.0)
         assertEquals(0.0, transaction?.fee ?: 0.0, 0.0)
         assertEquals(TransactionType.RECEIVED, transaction?.transactionType)
+        assertEquals("0787654321", transaction?.senderPhone)
+    }
+
+    @Test
+    fun testMpesaReceivedParsingWithMaskedSenderPhone() {
+        val parser = MpesaParser()
+        val sms = "TL10ABC12D Confirmed. You have received Ksh500.00 from JANE DOE 0702***507 on 9/7/26 at 6:50 PM. New M-PESA balance is Ksh1,000.00. Transaction cost, Ksh0.00."
+        val transaction = parser.parse(sms, 1773072000000L)
+
+        assertNotNull(transaction)
+        assertEquals("JANE DOE", transaction?.merchant)
+        assertEquals("0702***507", transaction?.senderPhone)
+        assertEquals(TransactionType.RECEIVED, transaction?.transactionType)
+    }
+
+    @Test
+    fun testMpesaReceivedParsingWithoutSenderPhone() {
+        val parser = MpesaParser()
+        val sms = "TL10ABC12D Confirmed. You have received Ksh500.00 from JANE DOE. New M-PESA balance is Ksh1,000.00."
+        val transaction = parser.parse(sms, 1773072000000L)
+
+        assertNotNull(transaction)
+        assertEquals("JANE DOE", transaction?.merchant)
+        assertEquals("", transaction?.senderPhone)
+        assertEquals(TransactionType.RECEIVED, transaction?.transactionType)
     }
 
     @Test

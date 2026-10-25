@@ -38,21 +38,28 @@ class MpesaParser : SmsParser {
         return when {
             body.contains("received", ignoreCase = true) -> {
                 // Received pattern: QX87654321 Confirmed. You have received Ksh1,200.00 from SARAH WANJIKU 0787654321 on ...
-                val regex = Pattern.compile("received\\s+Ksh\\s*([\\d,]+\\.?\\d*)\\s+from\\s+([^\\n\\d]+)", Pattern.CASE_INSENSITIVE)
+                // The sender segment runs up to " on <date>" (or ". New M-PESA balance") and may contain
+                // the sender's phone number, which may be masked (e.g. 0702***507).
+                val regex = Pattern.compile(
+                    "received\\s+Ksh\\s*([\\d,]+\\.?\\d*)\\s+from\\s+(.+?)(?:\\s+on\\s+|\\.\\s*New\\s+M-PESA|\\s*$)",
+                    Pattern.CASE_INSENSITIVE
+                )
                 val matcher = regex.matcher(body)
                 if (matcher.find()) {
                     val amount = matcher.group(1)?.cleanAmount() ?: 0.0
-                    val senderName = matcher.group(2)?.trim() ?: "Unknown Sender"
+                    val senderSegment = matcher.group(2)?.trim() ?: ""
+                    val (senderName, senderPhone) = splitSenderSegment(senderSegment)
                     Transaction(
                         receiptNumber = receiptNumber,
                         provider = "M-PESA",
                         transactionType = TransactionType.RECEIVED,
                         amount = amount,
-                        merchant = senderName,
+                        merchant = senderName.ifBlank { "Unknown Sender" },
                         balance = balance,
                         fee = fee,
                         timestamp = timestamp,
-                        originalSms = smsBody
+                        originalSms = smsBody,
+                        senderPhone = senderPhone
                     )
                 } else null
             }
@@ -140,7 +147,29 @@ class MpesaParser : SmsParser {
         }
     }
 
+    /**
+     * Splits the text between "from" and " on <date>" into the sender's display name and,
+     * when present, their phone number. Handles masked numbers such as "0702***507".
+     */
+    private fun splitSenderSegment(segment: String): Pair<String, String> {
+        val trimmed = segment.trim()
+        if (trimmed.isEmpty()) return "Unknown Sender" to ""
+
+        val tokens = trimmed.split(Regex("\\s+"))
+        val lastToken = tokens.last()
+        return if (PHONE_TOKEN.matches(lastToken)) {
+            tokens.dropLast(1).joinToString(" ").trim() to lastToken
+        } else {
+            trimmed to ""
+        }
+    }
+
     private fun String.cleanAmount(): Double {
         return this.replace(",", "").toDoubleOrNull() ?: 0.0
+    }
+
+    private companion object {
+        // Kenyan MSISDN, optionally masked: 07XX..., +2547XX..., 0702***507
+        val PHONE_TOKEN = Regex("^(?:\\+?254|0)[\\d*]{6,13}$")
     }
 }

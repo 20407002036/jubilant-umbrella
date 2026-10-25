@@ -11,7 +11,8 @@ interface TransactionRepository {
     fun searchTransactions(query: String): Flow<List<TransactionEntity>>
     fun getTransactionsByCategory(category: String): Flow<List<TransactionEntity>>
     fun getTransactionsByRecipient(recipient: String): Flow<List<TransactionEntity>>
-    
+    fun getBySim(simSlot: Int): Flow<List<TransactionEntity>>
+
     fun getIncomingSumSince(startTime: Long): Flow<Double>
     fun getOutgoingSumSince(startTime: Long): Flow<Double>
 

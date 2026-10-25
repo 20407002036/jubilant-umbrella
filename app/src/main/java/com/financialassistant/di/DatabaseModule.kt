@@ -28,6 +28,7 @@ object DatabaseModule {
             AppDatabase.DATABASE_NAME
         )
         .addCallback(AppDatabase.PREPOPULATE_CALLBACK)
+        .addMigrations(AppDatabase.MIGRATION_1_2)
         .fallbackToDestructiveMigration()
         .build()
     }

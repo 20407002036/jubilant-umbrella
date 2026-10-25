@@ -32,6 +32,12 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE recipient = :recipient ORDER BY timestamp DESC")
     fun getTransactionsByRecipient(recipient: String): Flow<List<TransactionEntity>>
 
+    @Query("SELECT * FROM transactions WHERE simSlot = :simSlot ORDER BY timestamp DESC")
+    fun getBySim(simSlot: Int): Flow<List<TransactionEntity>>
+
+    @Query("UPDATE transactions SET simSlot = :simSlot WHERE id = :id")
+    suspend fun updateSimSlot(id: Long, simSlot: Int)
+
     @Query("SELECT SUM(amount) FROM transactions WHERE type = 'RECEIVED' AND timestamp >= :startTime")
     fun getIncomingSumSince(startTime: Long): Flow<Double?>
 

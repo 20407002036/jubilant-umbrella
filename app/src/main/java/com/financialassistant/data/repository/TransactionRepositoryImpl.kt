@@ -31,6 +31,9 @@ class TransactionRepositoryImpl @Inject constructor(
     override fun getTransactionsByRecipient(recipient: String): Flow<List<TransactionEntity>> =
         transactionDao.getTransactionsByRecipient(recipient)
 
+    override fun getBySim(simSlot: Int): Flow<List<TransactionEntity>> =
+        transactionDao.getBySim(simSlot)
+
     override fun getIncomingSumSince(startTime: Long): Flow<Double> =
         transactionDao.getIncomingSumSince(startTime).map { it ?: 0.0 }
 
@@ -49,8 +52,13 @@ class TransactionRepositoryImpl @Inject constructor(
         if (transaction.amount <= 0.0) return false
         if (transaction.timestamp <= 0) return false
         
-        // Deduplication Check
-        if (transactionDao.getTransactionByReceipt(transaction.receiptNumber) != null) {
+        // Deduplication Check. If an earlier import could not determine the SIM slot,
+        // fill it in when a later scan (or live delivery) resolves it.
+        val existing = transactionDao.getTransactionByReceipt(transaction.receiptNumber)
+        if (existing != null) {
+            if (existing.simSlot == -1 && transaction.simSlot != -1) {
+                transactionDao.updateSimSlot(existing.id, transaction.simSlot)
+            }
             return false
         }
 
@@ -68,7 +76,9 @@ class TransactionRepositoryImpl @Inject constructor(
             fee = transaction.fee,
             timestamp = transaction.timestamp,
             originalSms = transaction.originalSms,
-            category = category
+            category = category,
+            senderPhone = transaction.senderPhone,
+            simSlot = transaction.simSlot
         )
         val rowId = transactionDao.insertTransaction(transactionEntity)
         if (rowId == -1L) return false

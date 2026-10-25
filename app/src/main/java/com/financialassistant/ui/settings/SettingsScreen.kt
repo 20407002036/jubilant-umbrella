@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -21,10 +22,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.financialassistant.tracking.MsisdnNormalizer
+import com.financialassistant.tracking.TrackedLinePreferences
 import com.financialassistant.ui.theme.*
 import com.financialassistant.viewmodel.ImportStatus
 import com.financialassistant.viewmodel.SettingsViewModel
@@ -44,9 +48,14 @@ fun SettingsScreen(
     // Check permissions dynamically
     val hasReadSms = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
     val hasReceiveSms = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
+    val hasPhoneState = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
 
     LaunchedEffect(hasReadSms, hasReceiveSms) {
         viewModel.setSmsPermissionGranted(hasReadSms && hasReceiveSms)
+    }
+
+    LaunchedEffect(hasPhoneState) {
+        viewModel.setPhonePermissionGranted(hasPhoneState)
     }
 
     // Permission launcher
@@ -56,6 +65,14 @@ fun SettingsScreen(
         val readGranted = permissions[Manifest.permission.READ_SMS] ?: false
         val receiveGranted = permissions[Manifest.permission.RECEIVE_SMS] ?: false
         viewModel.setSmsPermissionGranted(readGranted && receiveGranted)
+    }
+
+    // Phone permission launcher (used to auto-detect which SIM holds the tracked number)
+    val phonePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.READ_PHONE_STATE] ?: false
+        viewModel.setPhonePermissionGranted(granted)
     }
 
     Scaffold(
@@ -146,6 +163,148 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.bodyMedium
                             )
+                        }
+                    }
+                }
+            }
+
+            // Tracked M-PESA Line Card
+            Card(
+                colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = "Tracked M-PESA Line",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Track money coming into one of your Safaricom numbers. On a dual-SIM phone, the app matches each M-PESA SMS to the SIM line it arrived on.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = uiState.trackedNumberInput,
+                        onValueChange = { viewModel.onTrackedNumberInputChange(it) },
+                        label = { Text("M-PESA number", color = TextSecondary) },
+                        placeholder = { Text("0712 345 678", color = TextMuted) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = EmeraldPrimary,
+                            unfocusedBorderColor = BorderColor,
+                            focusedContainerColor = DarkSurface,
+                            unfocusedContainerColor = DarkSurface,
+                            focusedLabelColor = TextSecondary,
+                            unfocusedLabelColor = TextSecondary,
+                            cursorColor = EmeraldPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    if (uiState.isTrackingConfigured) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = EmeraldPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            val slotLabel = if (uiState.trackedSlot == TrackedLinePreferences.SLOT_UNSPECIFIED) {
+                                "SIM not set"
+                            } else {
+                                "SIM ${uiState.trackedSlot + 1}"
+                            }
+                            Text(
+                                text = "Tracking ${MsisdnNormalizer.format(uiState.trackedNumber)} • $slotLabel",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextPrimary
+                            )
+                        }
+                    }
+
+                    uiState.trackingMessage?.let { message ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = { viewModel.saveTrackedLine() },
+                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (uiState.isTrackingConfigured) "Update Tracked Line" else "Save & Detect SIM",
+                            color = DarkBackground,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (!uiState.hasPhonePermission) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                phonePermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.READ_PHONE_STATE,
+                                        Manifest.permission.READ_PHONE_NUMBERS
+                                    )
+                                )
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                            border = BorderStroke(1.dp, BorderColor),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Allow SIM detection", fontWeight = FontWeight.Medium)
+                        }
+                    }
+
+                    if (uiState.isTrackingConfigured &&
+                        uiState.trackedSlot == TrackedLinePreferences.SLOT_UNSPECIFIED
+                    ) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Which SIM holds this number?",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            (0..1).forEach { slot ->
+                                OutlinedButton(
+                                    onClick = { viewModel.selectTrackedSlot(slot) },
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EmeraldPrimary),
+                                    border = BorderStroke(1.dp, EmeraldPrimary),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("SIM ${slot + 1}", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    if (uiState.isTrackingConfigured) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TextButton(
+                            onClick = { viewModel.clearTrackedLine() },
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            Text("Remove tracked line", color = CoralExpense)
                         }
                     }
                 }

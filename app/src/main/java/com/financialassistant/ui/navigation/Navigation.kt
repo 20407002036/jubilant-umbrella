@@ -9,9 +9,11 @@ import androidx.navigation.navArgument
 import com.financialassistant.data.repository.TransactionRepository
 import com.financialassistant.ui.details.DetailsScreen
 import com.financialassistant.ui.home.HomeScreen
+import com.financialassistant.ui.incoming.IncomingScreen
 import com.financialassistant.ui.settings.SettingsScreen
 import com.financialassistant.ui.transactions.TransactionsScreen
 import com.financialassistant.viewmodel.HomeViewModel
+import com.financialassistant.viewmodel.IncomingViewModel
 import com.financialassistant.viewmodel.SettingsViewModel
 import com.financialassistant.viewmodel.TransactionsViewModel
 
@@ -21,6 +23,7 @@ sealed class Screen(val route: String) {
     object Details : Screen("details/{receiptNumber}") {
         fun createRoute(receiptNumber: String) = "details/$receiptNumber"
     }
+    object Incoming : Screen("incoming")
     object Settings : Screen("settings")
 }
 
@@ -30,6 +33,7 @@ fun AppNavigation(
     homeViewModel: HomeViewModel,
     transactionsViewModel: TransactionsViewModel,
     settingsViewModel: SettingsViewModel,
+    incomingViewModel: IncomingViewModel,
     repository: TransactionRepository
 ) {
     NavHost(
@@ -43,6 +47,7 @@ fun AppNavigation(
                 onNavigateToDetails = { receiptNumber ->
                     navController.navigate(Screen.Details.createRoute(receiptNumber))
                 },
+                onNavigateToIncoming = { navController.navigate(Screen.Incoming.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
@@ -66,6 +71,14 @@ fun AppNavigation(
                 receiptNumber = receiptNumber,
                 repository = repository,
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Incoming.route) {
+            IncomingScreen(
+                viewModel = incomingViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
 
