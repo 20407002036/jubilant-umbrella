@@ -9,6 +9,7 @@ import com.financialassistant.data.repository.TransactionRepository
 import com.financialassistant.ui.navigation.AppNavigation
 import com.financialassistant.ui.theme.FinancialAssistantTheme
 import com.financialassistant.viewmodel.HomeViewModel
+import com.financialassistant.viewmodel.IncomingViewModel
 import com.financialassistant.viewmodel.SettingsViewModel
 import com.financialassistant.viewmodel.TransactionsViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -23,6 +24,7 @@ class MainActivity : ComponentActivity() {
     private val homeViewModel: HomeViewModel by viewModels()
     private val transactionsViewModel: TransactionsViewModel by viewModels()
     private val settingsViewModel: SettingsViewModel by viewModels()
+    private val incomingViewModel: IncomingViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +38,7 @@ class MainActivity : ComponentActivity() {
                     homeViewModel = homeViewModel,
                     transactionsViewModel = transactionsViewModel,
                     settingsViewModel = settingsViewModel,
+                    incomingViewModel = incomingViewModel,
                     repository = repository
                 )
             }

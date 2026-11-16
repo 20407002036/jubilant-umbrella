@@ -1,29 +1,40 @@
 package com.financialassistant.ui.home
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.financialassistant.data.entities.TransactionEntity
 import com.financialassistant.ui.theme.*
-import com.financialassistant.viewmodel.HomeViewModel
+import com.financialassistant.viewmodel.*
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -32,6 +43,7 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToTransactions: () -> Unit,
     onNavigateToDetails: (String) -> Unit,
+    onNavigateToIncoming: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -47,27 +59,32 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "Hello, welcome back",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
-                    )
-                    Text(
-                        text = "Financial Assistant",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                        color = TextPrimary
-                    )
-                }
-                IconButton(
-                    onClick = onNavigateToSettings,
-                    colors = IconButtonDefaults.iconButtonColors(contentColor = TextPrimary)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        modifier = Modifier.size(26.dp)
-                    )
+                Text(
+                    text = "Reports",
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    color = TextPrimary
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onNavigateToIncoming,
+                        colors = IconButtonDefaults.iconButtonColors(contentColor = TextPrimary)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CallReceived,
+                            contentDescription = "My lines",
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onNavigateToSettings,
+                        colors = IconButtonDefaults.iconButtonColors(contentColor = TextPrimary)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
                 }
             }
         },
@@ -88,77 +105,57 @@ fun HomeScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Balance and Overview Card
+                // Report Type Dropdown
                 item {
-                    BalanceOverviewCard(
-                        income = uiState.monthlyIncome,
-                        expense = uiState.monthlyExpenses
+                    ReportTypeDropdown(
+                        selectedType = uiState.reportType,
+                        onTypeSelected = { viewModel.setReportType(it) }
                     )
                 }
 
-                // Analytic Summaries (Top Merchant & Frequent Merchant)
-                if (uiState.topMerchant != null || uiState.mostFrequentMerchant != null) {
-                    item {
-                        MerchantMetricsSection(
-                            topMerchant = uiState.topMerchant,
-                            frequentMerchant = uiState.mostFrequentMerchant
-                        )
-                    }
-                }
-
-                // Category Spending Chart
-                if (uiState.spendingByCategory.isNotEmpty()) {
-                    item {
-                        CategorySpendingCard(spending = uiState.spendingByCategory)
-                    }
-                }
-
-                // Recent Transactions Header
+                // Time Range Selector
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Recent Transactions",
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = TextPrimary
-                        )
-                        Text(
-                            text = "View All",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = EmeraldPrimary,
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            modifier = Modifier
-                                .clickable { onNavigateToTransactions() }
-                                .padding(4.dp)
-                        )
-                    }
+                    TimeRangeSelector(
+                        selectedRange = uiState.timeRange,
+                        onRangeSelected = { viewModel.setTimeRange(it) }
+                    )
                 }
 
-                // Recent Transactions List
-                if (uiState.recentTransactions.isEmpty()) {
+                // Bar Chart
+                item {
+                    BarChartCard(
+                        chartData = uiState.chartData,
+                        selectedIndex = uiState.selectedBarIndex,
+                        onBarSelected = { viewModel.setSelectedBar(it) }
+                    )
+                }
+
+                // Period Label
+                item {
+                    Text(
+                        text = uiState.periodLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
+
+                // Transaction Breakdown Header
+                item {
+                    Text(
+                        text = "Transactions",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = TextPrimary
+                    )
+                }
+
+                // Transaction List or Empty State
+                if (uiState.filteredTransactions.isEmpty()) {
                     item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(DarkSurface)
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No recent transactions found.\nGo to Settings to import your SMS history.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = TextSecondary,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
+                        EmptyState()
                     }
                 } else {
-                    items(uiState.recentTransactions) { transaction ->
+                    itemsIndexed(uiState.filteredTransactions) { _, transaction ->
                         TransactionRowItem(
                             transaction = transaction,
                             onClick = { onNavigateToDetails(transaction.receiptNumber) }
@@ -166,7 +163,7 @@ fun HomeScreen(
                     }
                 }
 
-                // Spacer at bottom
+                // Bottom spacer
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
                 }
@@ -175,92 +172,73 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BalanceOverviewCard(income: Double, expense: Double) {
-    val netBalance = income - expense
-    val formattedBalance = String.format("KES %,.2f", netBalance)
-    val formattedIncome = String.format("KES %,.2f", income)
-    val formattedExpense = String.format("KES %,.2f", expense)
+fun ReportTypeDropdown(
+    selectedType: ReportType,
+    onTypeSelected: (ReportType) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(DarkSurface)
-            .padding(24.dp)
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
     ) {
-        Text(
-            text = "TOTAL NET BALANCE",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextSecondary,
-            letterSpacing = 1.sp
-        )
-        Text(
-            text = formattedBalance,
-            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-            color = if (netBalance >= 0) TextPrimary else CoralExpense,
-            modifier = Modifier.padding(vertical = 4.dp)
+        OutlinedTextField(
+            value = selectedType.label,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Report Type", color = TextSecondary) },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary,
+                focusedBorderColor = EmeraldPrimary,
+                unfocusedBorderColor = BorderColor,
+                focusedContainerColor = DarkSurface,
+                unfocusedContainerColor = DarkSurface,
+                focusedLabelColor = TextSecondary,
+                unfocusedLabelColor = TextSecondary
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+            shape = RoundedCornerShape(16.dp)
         )
 
-        Divider(
-            color = BorderColor,
-            modifier = Modifier.padding(vertical = 16.dp)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
         ) {
-            // Income Side
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(TealInflow.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowDownward,
-                        contentDescription = "Income",
-                        tint = TealInflow,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(text = "Income", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-                    Text(
-                        text = formattedIncome,
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                        color = TealInflow
-                    )
-                }
-            }
-
-            // Expense Side
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(CoralExpense.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowUpward,
-                        contentDescription = "Expense",
-                        tint = CoralExpense,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(text = "Expenses", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-                    Text(
-                        text = formattedExpense,
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                        color = CoralExpense
+            Column(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(DarkSurface)
+            ) {
+                ReportType.entries.forEach { type ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = type.label,
+                                color = if (type == selectedType) EmeraldPrimary else TextPrimary
+                            )
+                        },
+                        onClick = {
+                            onTypeSelected(type)
+                            expanded = false
+                        },
+                        leadingIcon = if (type == selectedType) {
+                            {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = EmeraldPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        } else null
                     )
                 }
             }
@@ -269,72 +247,177 @@ fun BalanceOverviewCard(income: Double, expense: Double) {
 }
 
 @Composable
-fun MerchantMetricsSection(
-    topMerchant: Pair<String, Double>?,
-    frequentMerchant: Pair<String, Int>?
+fun TimeRangeSelector(
+    selectedRange: TimeRange,
+    onRangeSelected: (TimeRange) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(DarkSurface)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        if (topMerchant != null) {
-            Card(
-                modifier = Modifier.weight(1f),
-                colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                shape = RoundedCornerShape(16.dp)
+        TimeRange.entries.forEach { range ->
+            val isSelected = range == selectedRange
+            val bgColor by animateFloatAsState(
+                targetValue = if (isSelected) 1f else 0f,
+                animationSpec = tween(200),
+                label = "bg"
+            )
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        lerp(DarkSurfaceVariant, FilterActiveBg, bgColor)
+                    )
+                    .clickable { onRangeSelected(range) }
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.LocalMall,
-                        contentDescription = "Largest Spend",
-                        tint = AccentOrange,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = "Largest Expense", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-                    Text(
-                        text = topMerchant.first,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = String.format("KES %,.2f", topMerchant.second),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
+                Text(
+                    text = range.label,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                    ),
+                    color = if (isSelected) TextPrimary else TextSecondary
+                )
             }
         }
+    }
+}
 
-        if (frequentMerchant != null) {
-            Card(
-                modifier = Modifier.weight(1f),
-                colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                shape = RoundedCornerShape(16.dp)
+@Composable
+fun BarChartCard(
+    chartData: List<ChartBarData>,
+    selectedIndex: Int,
+    onBarSelected: (Int) -> Unit
+) {
+    val maxAmount = chartData.maxOfOrNull { it.amount } ?: 1.0
+    val animatedProgress = remember { Animatable(0f) }
+
+    LaunchedEffect(chartData) {
+        animatedProgress.snapTo(0f)
+        animatedProgress.animateTo(1f, animationSpec = tween(600))
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(8.dp, RoundedCornerShape(24.dp)),
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            // Selected value badge
+            if (selectedIndex < chartData.size && chartData[selectedIndex].amount > 0) {
+                val badgeText = String.format("KES %,.0f", chartData[selectedIndex].amount)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ChartBadgeBg)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = badgeText,
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                            color = TextPrimary
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Chart Canvas with clickable overlay
+            val barColor = ChartBarBlue
+            val barSelectedColor = ChartBarBlueSelected
+            val barInactiveColor = ChartBarDefault
+            val labelColor = TextSecondary
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Repeat,
-                        contentDescription = "Frequent Merchant",
-                        tint = EmeraldSecondary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = "Top Payee", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
-                    Text(
-                        text = frequentMerchant.first,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = "${frequentMerchant.second} transactions",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
+                Canvas(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    if (chartData.isEmpty()) return@Canvas
+
+                    val barCount = chartData.size
+                    val spacing = 12.dp.toPx()
+                    val totalSpacing = spacing * (barCount + 1)
+                    val barWidth = (size.width - totalSpacing) / barCount
+                    val chartHeight = size.height - 30.dp.toPx()
+                    val cornerRadius = 8.dp.toPx()
+
+                    chartData.forEachIndexed { index, barData ->
+                        val normalizedHeight = if (maxAmount > 0) {
+                            (barData.amount / maxAmount * chartHeight * animatedProgress.value).toFloat()
+                        } else 0f
+
+                        val x = spacing + index * (barWidth + spacing)
+                        val y = chartHeight - normalizedHeight
+
+                        val color = when {
+                            index == selectedIndex -> barSelectedColor
+                            barData.amount > 0 -> barColor
+                            else -> barInactiveColor
+                        }
+
+                        drawRoundRect(
+                            color = color,
+                            topLeft = Offset(x, y),
+                            size = Size(barWidth, normalizedHeight.coerceAtLeast(4.dp.toPx())),
+                            cornerRadius = CornerRadius(cornerRadius, cornerRadius)
+                        )
+
+                        if (index == selectedIndex && normalizedHeight > 0) {
+                            drawRoundRect(
+                                color = barSelectedColor.copy(alpha = 0.3f),
+                                topLeft = Offset(x - 2.dp.toPx(), y - 2.dp.toPx()),
+                                size = Size(barWidth + 4.dp.toPx(), normalizedHeight + 4.dp.toPx()),
+                                cornerRadius = CornerRadius(cornerRadius + 2.dp.toPx(), cornerRadius + 2.dp.toPx()),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                            )
+                        }
+
+                        drawContext.canvas.nativeCanvas.apply {
+                            val paint = android.graphics.Paint().apply {
+                                textSize = 12.sp.toPx()
+                                textAlign = android.graphics.Paint.Align.CENTER
+                                isAntiAlias = true
+                            }
+                            paint.color = labelColor.toArgb()
+                            drawText(
+                                barData.label,
+                                x + barWidth / 2,
+                                size.height,
+                                paint
+                            )
+                        }
+                    }
+                }
+
+                // Clickable overlay for each bar
+                if (chartData.isNotEmpty()) {
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        chartData.forEachIndexed { index, _ ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable { onBarSelected(index) }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -342,76 +425,29 @@ fun MerchantMetricsSection(
 }
 
 @Composable
-fun CategorySpendingCard(spending: List<com.financialassistant.viewmodel.CategorySpend>) {
-    val totalExpense = spending.sumOf { it.amount }
-
-    Column(
+fun EmptyState() {
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(DarkSurface)
-            .padding(20.dp)
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = "SPENDING BY CATEGORY",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextSecondary,
-            letterSpacing = 1.sp
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        spending.take(4).forEach { catSpend ->
-            val percentage = if (totalExpense > 0) catSpend.amount / totalExpense else 0.0
-            val color = try {
-                Color(android.graphics.Color.parseColor(catSpend.colorHex))
-            } catch (e: Exception) {
-                TextMuted
-            }
-
-            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(color)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = catSpend.name,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                            color = TextPrimary
-                        )
-                    }
-                    Text(
-                        text = String.format("KES %,.2f", catSpend.amount),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        color = TextPrimary
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                // Progress Bar
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(DarkBackground)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(fraction = percentage.toFloat())
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(color)
-                    )
-                }
-            }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Default.BarChart,
+                contentDescription = null,
+                tint = TextMuted,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "No financial activity recorded\nfor this period.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -454,7 +490,6 @@ fun TransactionRowItem(transaction: TransactionEntity, onClick: () -> Unit) {
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Icon Box
         Box(
             modifier = Modifier
                 .size(44.dp)
@@ -472,7 +507,6 @@ fun TransactionRowItem(transaction: TransactionEntity, onClick: () -> Unit) {
 
         Spacer(modifier = Modifier.width(16.dp))
 
-        // Merchant and Date
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = transaction.recipient,
@@ -488,7 +522,6 @@ fun TransactionRowItem(transaction: TransactionEntity, onClick: () -> Unit) {
             )
         }
 
-        // Amount & Category Badge
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 text = String.format("${if (isInflow) "+" else "-"}KES %,.2f", transaction.amount),

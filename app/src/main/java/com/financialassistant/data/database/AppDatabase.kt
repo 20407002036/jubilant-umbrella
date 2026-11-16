@@ -2,6 +2,7 @@ package com.financialassistant.data.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.financialassistant.data.dao.CategoryDao
 import com.financialassistant.data.dao.RecipientDao
@@ -12,7 +13,7 @@ import com.financialassistant.data.entities.TransactionEntity
 
 @Database(
     entities = [TransactionEntity::class, CategoryEntity::class, RecipientEntity::class],
-    version = 1,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -22,6 +23,27 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "financial_assistant_db"
+
+        /**
+         * Adds the columns required to record who sent an incoming payment and which
+         * SIM line the notification arrived on, without dropping existing data.
+         */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transactions ADD COLUMN senderPhone TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE transactions ADD COLUMN simSlot INTEGER NOT NULL DEFAULT -1")
+            }
+        }
+
+        /**
+         * Tracks which incoming payments have already been written to the user's
+         * Google Sheet so retries never append duplicate rows.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transactions ADD COLUMN syncedAt INTEGER NOT NULL DEFAULT 0")
+            }
+        }
 
         val PREPOPULATE_CALLBACK = object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

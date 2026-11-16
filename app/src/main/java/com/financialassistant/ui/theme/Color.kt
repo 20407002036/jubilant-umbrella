@@ -18,3 +18,15 @@ val TextMuted = Color(0xFF64748B)          // Slate 500
 
 val BorderColor = Color(0xFF2D3748)
 val AccentOrange = Color(0xFFF59E0B)       // Alerts / fees
+
+// Chart Colors
+val ChartBarBlue = Color(0xFF60A5FA)       // Primary bar color
+val ChartBarPink = Color(0xFFF472B6)       // Secondary bar color
+val ChartBarBlueSelected = Color(0xFF93C5FD) // Selected bar blue
+val ChartBarPinkSelected = Color(0xFFF9A8D4) // Selected bar pink
+val ChartBarDefault = Color(0xFF334155)    // Inactive/empty bar
+val ChartBadgeBg = Color(0xFF1E3A5F)       // Value badge background
+
+// Filter Chip Colors
+val FilterActiveBg = Color(0xFF1E3A5F)
+val FilterInactiveBg = Color(0xFF1E293B)

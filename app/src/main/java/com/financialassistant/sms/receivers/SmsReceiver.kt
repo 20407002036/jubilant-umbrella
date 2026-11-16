@@ -7,6 +7,10 @@ import android.provider.Telephony
 import com.financialassistant.data.repository.TransactionRepository
 import com.financialassistant.sms.filters.SenderFilter
 import com.financialassistant.sms.parsers.ParserFactory
+import com.financialassistant.sync.IncomeSyncScheduler
+import com.financialassistant.sync.TrackedIncomeFilter
+import com.financialassistant.tracking.SmsSimSlotResolver
+import com.financialassistant.tracking.TrackedLinePreferences
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +23,12 @@ class SmsReceiver : BroadcastReceiver() {
 
     @Inject
     lateinit var repository: TransactionRepository
+
+    @Inject
+    lateinit var trackedLinePreferences: TrackedLinePreferences
+
+    @Inject
+    lateinit var incomeSyncScheduler: IncomeSyncScheduler
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
@@ -33,13 +43,26 @@ class SmsReceiver : BroadcastReceiver() {
                 if (SenderFilter.isFinancialSender(sender)) {
                     val parser = ParserFactory.getParser(sender)
                     if (parser != null) {
-                        val transaction = parser.parse(body, timestamp)
-                        if (transaction != null) {
+                        val parsed = parser.parse(body, timestamp)
+                        if (parsed != null) {
+                            // Tag the record with the SIM line the notification arrived on.
+                            val transaction = parsed.copy(
+                                simSlot = SmsSimSlotResolver.resolveSlot(context, intent)
+                            )
                             // Asynchronously insert the transaction
                             CoroutineScope(Dispatchers.IO).launch {
                                 val inserted = repository.insertTransaction(transaction)
                                 if (inserted) {
                                     Timber.d("Successfully saved transaction from SMS: ${transaction.receiptNumber}")
+                                    if (TrackedIncomeFilter.shouldSync(
+                                            transactionType = transaction.transactionType.name,
+                                            simSlot = transaction.simSlot,
+                                            trackedNumber = trackedLinePreferences.trackedNumber.value.orEmpty(),
+                                            trackedSlot = trackedLinePreferences.trackedSlot.value
+                                        )
+                                    ) {
+                                        incomeSyncScheduler.enqueue(transaction.receiptNumber)
+                                    }
                                 } else {
                                     Timber.d("Transaction already exists or is invalid: ${transaction.receiptNumber}")
                                 }
