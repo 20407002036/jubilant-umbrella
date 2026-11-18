@@ -337,7 +337,7 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "When money is received on your tracked line, add a row with the sender and amount to a Google Sheet.",
+                        text = "When money is received on your tracked line, add it to your contribution ledger Google Sheet.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary
                     )
@@ -451,14 +451,14 @@ fun SettingsScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                             } else {
-                                Text("Send test row", fontWeight = FontWeight.Medium)
+                                Text("Test connection", fontWeight = FontWeight.Medium)
                             }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "Setup: open your Sheet → Extensions → Apps Script → paste google-sheet-sync.gs → Deploy → Web app (execute as you, access: anyone) → paste the URL and secret above.",
+                        text = "Setup: open your Sheet → Extensions → Apps Script → paste contribution-ledger.gs → run Setup → Deploy → Web app (execute as you, access: anyone) → paste the URL and secret above.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextMuted
                     )

@@ -184,6 +184,7 @@ class SettingsViewModel @Inject constructor(
     /** Persists the Google Sheet endpoint and shared secret. */
     fun saveSheetSync() {
         val url = _uiState.value.sheetSyncUrl.trim()
+        val secret = _uiState.value.sheetSyncSecret.trim()
         if (url.isNotEmpty() && !url.startsWith("https://")) {
             _uiState.value = _uiState.value.copy(
                 sheetSyncMessage = "The web app URL must start with https://."
@@ -194,11 +195,12 @@ class SettingsViewModel @Inject constructor(
         googleSheetSyncPreferences.save(
             enabled = _uiState.value.sheetSyncEnabled,
             webAppUrl = url,
-            secret = _uiState.value.sheetSyncSecret
+            secret = secret
         )
 
         _uiState.value = _uiState.value.copy(
             sheetSyncUrl = url,
+            sheetSyncSecret = secret,
             sheetSyncMessage = when {
                 !_uiState.value.sheetSyncEnabled ->
                     "Saved. Turn on sync to start logging incoming payments."
@@ -210,9 +212,10 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
-    /** Appends a test row so the user can confirm the script and secret work. */
+    /** Checks that the web app URL and shared secret are reachable. */
     fun sendSheetSyncTestRow() {
         val url = _uiState.value.sheetSyncUrl.trim()
+        val secret = _uiState.value.sheetSyncSecret.trim()
         if (!url.startsWith("https://")) {
             _uiState.value = _uiState.value.copy(
                 sheetSyncMessage = "Add the https:// Apps Script web app URL first."
@@ -223,20 +226,22 @@ class SettingsViewModel @Inject constructor(
         googleSheetSyncPreferences.save(
             enabled = _uiState.value.sheetSyncEnabled,
             webAppUrl = url,
-            secret = _uiState.value.sheetSyncSecret
+            secret = secret
         )
         _uiState.value = _uiState.value.copy(
+            sheetSyncUrl = url,
+            sheetSyncSecret = secret,
             sheetSyncTesting = true,
-            sheetSyncMessage = "Sending a test row..."
+            sheetSyncMessage = "Checking the connection..."
         )
 
         viewModelScope.launch {
             val message = when (val outcome = incomeSyncClient.sendTest()) {
-                SyncOutcome.Success -> "Test row sent. Check your sheet."
+                SyncOutcome.Success -> "Test request accepted. The script is reachable."
                 SyncOutcome.NotConfigured -> "Add the Apps Script web app URL first."
                 SyncOutcome.Unauthorized -> "The secret did not match the script."
                 is SyncOutcome.Rejected -> "The script rejected the request: ${outcome.message ?: "HTTP ${outcome.code}"}."
-                is SyncOutcome.Retry -> "Could not reach the script. Check the URL and your connection."
+                is SyncOutcome.Retry -> "Could not reach the script. Check the /exec URL, access, and deployment."
             }
             _uiState.value = _uiState.value.copy(
                 sheetSyncTesting = false,
