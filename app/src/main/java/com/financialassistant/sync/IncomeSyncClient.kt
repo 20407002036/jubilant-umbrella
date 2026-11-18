@@ -10,7 +10,7 @@ import java.net.URL
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Result of attempting to append one payment to the user's Google Sheet. */
+/** Result of attempting to sync one payment to the user's contribution ledger. */
 sealed interface SyncOutcome {
     data object Success : SyncOutcome
     data object NotConfigured : SyncOutcome
@@ -20,9 +20,9 @@ sealed interface SyncOutcome {
 }
 
 /**
- * Posts incoming payments to a Google Apps Script web app, which appends a row to a
- * Google Sheet. The request is a plain HTTPS POST so the app needs no Google OAuth
- * or Play Services client.
+ * Posts incoming payments to the contribution-ledger Apps Script web app, which
+ * matches and allocates the payment in Google Sheets. The request is a plain HTTPS
+ * POST so the app needs no Google OAuth or Play Services client.
  */
 @Singleton
 class IncomeSyncClient @Inject constructor(
@@ -42,11 +42,12 @@ class IncomeSyncClient @Inject constructor(
             put("amount", transaction.amount)
             put("provider", transaction.provider)
             put("timestamp", transaction.timestamp)
+            put("rawSms", transaction.originalSms)
         }
         post(url, payload)
     }
 
-    /** Sends a harmless test row so the user can verify the sheet setup. */
+    /** Checks that the web app URL and shared secret are reachable without writing a row. */
     suspend fun sendTest(): SyncOutcome = withContext(Dispatchers.IO) {
         val url = preferences.webAppUrl.value
         if (url.isBlank()) return@withContext SyncOutcome.NotConfigured
@@ -95,7 +96,7 @@ class IncomeSyncClient @Inject constructor(
 
                 code !in 200..299 -> {
                     val message = body.take(200).ifBlank { null }
-                    if (code in 400..499) {
+                    if (code in 400..499 && code != 408 && code != 429) {
                         SyncOutcome.Rejected(code, message)
                     } else {
                         SyncOutcome.Retry(code, message)
@@ -111,8 +112,12 @@ class IncomeSyncClient @Inject constructor(
                         null
                     }
                     when {
-                        json == null || json.optBoolean("ok", true) -> SyncOutcome.Success
+                        json == null ->
+                            SyncOutcome.Retry(code, "The script returned an unexpected response.")
+                        json.optBoolean("ok", false) -> SyncOutcome.Success
                         json.optString("error") == "unauthorized" -> SyncOutcome.Unauthorized
+                        json.optBoolean("retry", false) ->
+                            SyncOutcome.Retry(code, json.optString("error").ifBlank { null })
                         else -> SyncOutcome.Rejected(code, json.optString("error").ifBlank { null })
                     }
                 }
